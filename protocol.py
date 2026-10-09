@@ -96,8 +96,9 @@ class Protocol:
         12288: ('bool',  'qos1',	0),
         12289: ('hex',   'qos2',	0),
         16640: ('hex',   'mirror',	0),
-        16384: ('stat',  'stats',	0),
+        16384: ('stat',  'stats',	1,	"Show port statistics"),
         17152: ('bool',  'loop_prev',	0),
+        16896: ('cable_test', 'cable_test', 1,	"Run cable tester"),
     }
 
     tp_ids = {v[1]: k for k, v in ids_tp.items()}
@@ -140,12 +141,14 @@ class Protocol:
         while len(payload) > len(Protocol.PACKET_END):
             dtype, dlen = struct.unpack('!hh', payload[0:4])
             data = payload[4:4+dlen]
-            results.append( (
-                dtype,
-                Protocol.ids_tp[dtype][1],
-                Protocol.interpret_value(data, Protocol.ids_tp[dtype][0])
-                )
-            )
+            if dtype not in Protocol.ids_tp:
+                results.append((dtype, "unknown", data))
+            else:
+                results.append((
+                    dtype,
+                    Protocol.ids_tp[dtype][1],
+                    Protocol.interpret_value(data, Protocol.ids_tp[dtype][0])
+                ))
             payload = payload[4+dlen:]
         return results
 
@@ -189,6 +192,9 @@ class Protocol:
                 value = value[0] > 0
             else:
                 raise AssertionError('boolean should be one byte long')
+        elif kind == 'cable_test':
+            types = {0: 'NO_CABLE', 1: 'NORMAL', 2: 'OPEN', 3: 'SHORT', 4: 'OPEN_SHORT', 5: 'CROSS_CABLE'}
+            value = (value[0], types.get(value[1], 'UNKNOWN'), int.from_bytes(value[2:], 'big'))
         return value
 
     def set_vlan(vlan_num, member_mask, tagged_mask, vlan_name):
